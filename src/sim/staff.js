@@ -91,7 +91,7 @@ export function returnMonster(monster, ctx) {
       k.path = null;
     }
   }
-  if (e && e.monsterId === monster.id) {
+  if (e && e.monsterIds.includes(monster.id)) {
     monster.state = 'enclosed';
     monster.pos = enclosureCenter(e);
     return;

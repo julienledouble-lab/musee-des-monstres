@@ -17,8 +17,8 @@ export class Builder {
     this.enclosures = new Map();
     this.buildings = new Map();
     this.nextId = 1;
-    // Set by World: called with the monster id when its enclosure is demolished.
-    // Must return true if the monster could be moved away.
+    // Set by World: called with the monster ids when their enclosure is demolished.
+    // Must return true if all of them could be moved away.
     this.onEnclosureEmptied = () => true;
     // Set by World: true when a moving entity (escaped monster) stands on the tile.
     this.isBlocked = () => false;
@@ -44,7 +44,9 @@ export class Builder {
     const price = area * BALANCE.enclosureCostPerTile;
     if (!this.wallet.spend(price)) return fail('noMoney');
     const id = `enc${this.nextId++}`;
-    this.enclosures.set(id, { id, x0, y0, x1, y1, habitat, area, price, monsterId: null });
+    this.enclosures.set(id, {
+      id, x0, y0, x1, y1, habitat, area, price, monsterIds: [], speciesId: null, breedTimer: 0,
+    });
     this.#fillRect(x0, y0, x1, y1, id);
     return { ok: true, id };
   }
@@ -69,8 +71,8 @@ export class Builder {
     const id = tile.occupant;
     if (id && this.enclosures.has(id)) {
       const e = this.enclosures.get(id);
-      if (e.monsterId && !this.onEnclosureEmptied(e.monsterId)) return fail('enclosureNotEmpty');
-      e.monsterId = null;
+      if (e.monsterIds.length && !this.onEnclosureEmptied([...e.monsterIds])) return fail('enclosureNotEmpty');
+      e.monsterIds = [];
       this.enclosures.delete(id);
       this.#fillRect(e.x0, e.y0, e.x1, e.y1, null);
       this.wallet.earn(e.price * BALANCE.demolishRefund);

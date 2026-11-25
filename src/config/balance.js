@@ -25,4 +25,8 @@ export const BALANCE = {
   souvenirPrice: 15,
   decorationRadius: 3,
   maxSubstepSec: 0.1,
+  breedTimeSec: 180,
+  breedMinHappiness: 70,
+  breedMaxHunger: 50,
+  rareChanceFromRareParent: 0.5,
 };

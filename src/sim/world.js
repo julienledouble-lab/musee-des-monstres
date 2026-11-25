@@ -6,7 +6,8 @@ import { createRng } from './rng.js';
 import { createMonster, updateMonster, escapeChancePerSec, feed } from './monsters.js';
 import { createVisitor, updateVisitor, spawnIntervalSec } from './visitors.js';
 import { hireKeeper, escapeMonster, updateEscaped, updateKeeper, catchByClick } from './staff.js';
-import { ExpeditionBase, Hatchery, placeMonsterInEnclosure } from './expeditions.js';
+import { ExpeditionBase, Hatchery, placeMonsterInEnclosure, createEgg } from './expeditions.js';
+import { canBreed, breedingParents, rollBabyRare } from './breeding.js';
 import { computeReputation } from './reputation.js';
 import { checkObjectives, speciesOwned } from './objectives.js';
 
@@ -114,14 +115,35 @@ export class World {
 
   // ---- simulation -----------------------------------------------------
 
-  #onEnclosureEmptied(monsterId) {
-    const m = this.monsters.get(monsterId);
-    if (!m) return true;
-    if (m.state === 'escaped') {
-      m.enclosureId = null; // goes to the hatchery when caught
-      return true;
+  // All monsters of a demolished enclosure must fit in the hatchery, otherwise refuse.
+  #onEnclosureEmptied(monsterIds) {
+    const ms = monsterIds.map((id) => this.monsters.get(id)).filter(Boolean);
+    const toStore = ms.filter((m) => m.state !== 'escaped');
+    if (this.hatchery.stored.length + toStore.length > BALANCE.hatcheryCapacity) return false;
+    for (const m of ms) {
+      if (m.state === 'escaped') m.enclosureId = null; // goes to the hatchery when caught
+      else this.hatchery.storeMonster(m);
     }
-    return this.hatchery.storeMonster(m);
+    return true;
+  }
+
+  #updateBreeding(dt) {
+    for (const e of this.builder.enclosures.values()) {
+      const pending = this.hatchery.eggs.filter((egg) => egg.parentEnclosureId === e.id).length;
+      if (!canBreed(e, this.monsters, pending)) {
+        // pause while conditions are not met; restart only when the pair is gone
+        if (breedingParents(e, this.monsters).length < 2 && e.monsterIds.length < 2) e.breedTimer = 0;
+        continue;
+      }
+      e.breedTimer += dt;
+      if (e.breedTimer < BALANCE.breedTimeSec) continue;
+      e.breedTimer = 0;
+      const parents = breedingParents(e, this.monsters);
+      this.hatchery.addEgg(createEgg({
+        speciesId: e.speciesId, rare: rollBabyRare(parents, this.rng), parentEnclosureId: e.id,
+      }));
+      this.events.push({ type: 'laid', speciesId: e.speciesId, enclosureId: e.id });
+    }
   }
 
   #step(dt) {
@@ -168,9 +190,13 @@ export class World {
       this.hatchery.addEgg(egg);
       this.events.push({ type: 'eggReady', egg });
     }
+    this.#updateBreeding(dt);
     for (const m of this.hatchery.update(dt)) {
       this.monsters.set(m.id, m);
-      this.events.push({ type: 'hatched', monsterId: m.id, speciesId: m.speciesId, rare: m.rare });
+      const home = m.homeEnclosureId && this.builder.enclosures.get(m.homeEnclosureId);
+      const placed = !!home && placeMonsterInEnclosure(m, home).ok;
+      if (placed) this.hatchery.takeMonster(m.id);
+      this.events.push({ type: 'hatched', monsterId: m.id, speciesId: m.speciesId, rare: m.rare, placed });
     }
 
     if (this.keepers.length) this.wallet.charge((BALANCE.keeperSalaryPerMin * this.keepers.length * dt) / 60);

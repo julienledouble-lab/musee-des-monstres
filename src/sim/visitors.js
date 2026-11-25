@@ -107,6 +107,16 @@ function exitTarget(ctx) {
   return { kind: 'exit', tile: { ...ctx.entrance } };
 }
 
+// Sum of the appeal of the monsters on show in the enclosure, or null if none is there.
+function enclosureAppeal(e, ctx) {
+  let total = null;
+  for (const id of e.monsterIds) {
+    const m = ctx.monsters.get(id);
+    if (m && m.state === 'enclosed') total = (total || 0) + appeal(m);
+  }
+  return total;
+}
+
 function chooseTarget(v, ctx) {
   const { rng } = ctx;
   if (v.state === 'fleeing') {
@@ -124,9 +134,9 @@ function chooseTarget(v, ctx) {
   if (!done) {
     const options = [];
     for (const e of ctx.builder.enclosures.values()) {
-      const m = e.monsterId && ctx.monsters.get(e.monsterId);
-      if (!m || m.state !== 'enclosed' || !ctx.builder.touchesPath(e.id)) continue;
-      options.push({ e, w: appeal(m) + 0.5 });
+      const total = enclosureAppeal(e, ctx);
+      if (total === null || !ctx.builder.touchesPath(e.id)) continue;
+      options.push({ e, w: total + 0.5 });
     }
     if (options.length) {
       let r = rng() * options.reduce((s, o) => s + o.w, 0);
@@ -221,9 +231,9 @@ function arrive(v, ctx) {
   }
   if (target.kind === 'enclosure') {
     const e = ctx.builder.enclosures.get(target.id);
-    const m = e && e.monsterId && ctx.monsters.get(e.monsterId);
-    if (m && m.state === 'enclosed') {
-      v.satisfaction = Math.min(1, v.satisfaction + appeal(m) / 50);
+    const total = e ? enclosureAppeal(e, ctx) : null;
+    if (total !== null) {
+      v.satisfaction = Math.min(1, v.satisfaction + total / 50);
       v.state = 'watching';
       v.timer = WATCH_SEC;
     } else {

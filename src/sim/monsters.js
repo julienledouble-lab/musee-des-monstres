@@ -21,7 +21,8 @@ export function createMonster(speciesId, { rare = false } = {}) {
 export function targetHappiness(monster, enclosure, watchers) {
   const sp = SPECIES[monster.speciesId];
   const habitatFactor = enclosure.habitat === sp.habitat ? 1 : 0.3;
-  const sizeFactor = Math.min(1, enclosure.area / sp.minArea);
+  const count = Math.max(1, enclosure.monsterIds ? enclosure.monsterIds.length : 1);
+  const sizeFactor = Math.min(1, enclosure.area / (sp.minArea * count));
   return clamp(100 * habitatFactor * sizeFactor - monster.hunger * 0.5, 0, 100);
 }
 

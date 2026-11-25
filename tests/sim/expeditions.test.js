@@ -84,19 +84,19 @@ describe('Hatchery', () => {
 });
 
 describe('placeMonsterInEnclosure', () => {
-  it('refuses wrong habitat and occupied enclosures', () => {
+  it('refuses wrong habitat and full enclosures', () => {
     const m = createMonster('dragonnet');
-    expect(placeMonsterInEnclosure(m, { id: 'e1', habitat: 'water', monsterId: null, x0: 0, y0: 0, x1: 1, y1: 1 }))
+    expect(placeMonsterInEnclosure(m, { id: 'e1', habitat: 'water', area: 6, monsterIds: [], speciesId: null, x0: 0, y0: 0, x1: 1, y1: 2 }))
       .toEqual({ ok: false, reason: 'wrongHabitat' });
-    expect(placeMonsterInEnclosure(m, { id: 'e2', habitat: 'lava', monsterId: 'x', x0: 0, y0: 0, x1: 1, y1: 1 }))
-      .toEqual({ ok: false, reason: 'occupied' });
+    expect(placeMonsterInEnclosure(m, { id: 'e2', habitat: 'lava', area: 6, monsterIds: ['x'], speciesId: 'dragonnet', x0: 0, y0: 0, x1: 1, y1: 2 }))
+      .toEqual({ ok: false, reason: 'full' });
   });
 
   it('places a monster in a matching empty enclosure', () => {
     const m = createMonster('dragonnet');
-    const e = { id: 'e3', habitat: 'lava', monsterId: null, x0: 2, y0: 2, x1: 4, y1: 4 };
+    const e = { id: 'e3', habitat: 'lava', area: 9, monsterIds: [], speciesId: null, x0: 2, y0: 2, x1: 4, y1: 4 };
     expect(placeMonsterInEnclosure(m, e).ok).toBe(true);
-    expect(e.monsterId).toBe(m.id);
+    expect(e.monsterIds).toEqual([m.id]);
     expect(m).toMatchObject({ state: 'enclosed', enclosureId: 'e3', pos: { x: 3, y: 3 } });
   });
 });

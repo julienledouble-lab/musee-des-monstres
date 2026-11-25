@@ -22,7 +22,8 @@ function addEnclosure(ctx, x0, y0, x1, y1, species = 'golem', habitat = 'forest'
   const m = createMonster(species);
   m.state = 'enclosed';
   m.enclosureId = r.id;
-  ctx.builder.enclosures.get(r.id).monsterId = m.id;
+  ctx.builder.enclosures.get(r.id).monsterIds = [m.id];
+  ctx.builder.enclosures.get(r.id).speciesId = species;
   ctx.monsters.set(m.id, m);
   return r.id;
 }

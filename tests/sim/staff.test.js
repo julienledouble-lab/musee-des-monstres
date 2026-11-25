@@ -18,7 +18,8 @@ function setup() {
   const m = createMonster('dragonnet');
   m.state = 'enclosed';
   m.enclosureId = r.id;
-  enclosure.monsterId = m.id;
+  enclosure.monsterIds = [m.id];
+  enclosure.speciesId = m.speciesId;
   const monsters = new Map([[m.id, m]]);
   const keepers = [];
   const ctx = { grid, wallet, builder, monsters, keepers, visitors: [], rng: createRng(5), stored: [] };
@@ -108,7 +109,7 @@ describe('staff', () => {
   it('a caught monster whose enclosure is gone goes to the hatchery', () => {
     const { ctx, m, enclosure } = setup();
     escapeMonster(m, enclosure, ctx.grid);
-    enclosure.monsterId = null;
+    enclosure.monsterIds = [];
     ctx.builder.demolish(5, 5);
     catchByClick(m, ctx);
     expect(m.state).toBe('stored');

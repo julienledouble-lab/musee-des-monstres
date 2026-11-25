@@ -111,14 +111,14 @@ describe('Builder', () => {
   it('demolish occupied enclosure refused when hook returns false; allowed when true', () => {
     const { builder, grid } = setup();
     const r = builder.placeEnclosure(2, 2, 3, 3, 'lava');
-    builder.enclosures.get(r.id).monsterId = 'm1';
+    builder.enclosures.get(r.id).monsterIds = ['m1', 'm2'];
     builder.onEnclosureEmptied = () => false;
     expect(builder.demolish(2, 2)).toEqual({ ok: false, reason: 'enclosureNotEmpty' });
     expect(builder.enclosures.has(r.id)).toBe(true);
     let got = null;
-    builder.onEnclosureEmptied = (id) => { got = id; return true; };
+    builder.onEnclosureEmptied = (ids) => { got = ids; return true; };
     expect(builder.demolish(3, 3).ok).toBe(true);
-    expect(got).toBe('m1');
+    expect(got).toEqual(['m1', 'm2']);
     expect(builder.enclosures.has(r.id)).toBe(false);
     expect(grid.isFree(2, 2)).toBe(true);
   });

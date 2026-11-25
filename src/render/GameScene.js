@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { tileToScreen, screenToTile } from '../sim/iso.js';
 import { generateTextures, monsterTextureKey } from './textures.js';
+import { capacity } from '../sim/breeding.js';
 
 const GROUND_DEPTH = -1e6;
 const FENCE_DEPTH = -5e5;
@@ -368,7 +369,7 @@ export class GameScene extends Phaser.Scene {
     }
     const enc = world.builder.enclosures.get(t.occupant);
     if (enc) {
-      this.ui.select(enc.monsterId ? { kind: 'monster', id: enc.monsterId } : { kind: 'enclosure', id: enc.id });
+      this.ui.select({ kind: 'enclosure', id: enc.id });
       return;
     }
     const bld = world.builder.buildings.get(t.occupant);
@@ -406,7 +407,11 @@ export class GameScene extends Phaser.Scene {
     if (type === 'placeMonster') {
       const t = grid.getTile(tile.tx, tile.ty);
       const enc = t.occupant && this.world.builder.enclosures.get(t.occupant);
-      diamondAt(tile.tx, tile.ty, !!enc && enc.habitat === this.tool.habitat && !enc.monsterId);
+      const sp = this.tool.speciesId;
+      const ok = !!enc && enc.habitat === this.tool.habitat
+        && (enc.monsterIds.length === 0 || enc.speciesId === sp)
+        && enc.monsterIds.length < capacity(enc, sp);
+      diamondAt(tile.tx, tile.ty, ok);
       return;
     }
     diamondAt(tile.tx, tile.ty, grid.isFree(tile.tx, tile.ty));

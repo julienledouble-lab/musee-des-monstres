@@ -2,6 +2,7 @@ import { BALANCE } from '../config/balance.js';
 import { LOCATIONS, SPECIES } from '../config/species.js';
 import { createMonster } from './monsters.js';
 import { enclosureCenter } from './staff.js';
+import { capacity } from './breeding.js';
 
 let nextEggId = 1;
 
@@ -31,15 +32,21 @@ export class ExpeditionBase {
     const loc = LOCATIONS[this.active.locationId];
     this.active = null;
     const speciesId = loc.species[Math.floor(rng() * loc.species.length) % loc.species.length];
-    return {
-      id: `egg${nextEggId++}`,
-      locationId: loc.id,
-      speciesId,
-      rare: rng() < BALANCE.rareChance,
-      remainingSec: BALANCE.hatchTimeSec,
-      ready: false,
-    };
+    return createEgg({ speciesId, rare: rng() < BALANCE.rareChance, locationId: loc.id });
   }
+}
+
+// parentEnclosureId: set for eggs laid in the museum; the baby joins its parents if there is room.
+export function createEgg({ speciesId, rare, locationId = null, parentEnclosureId = null }) {
+  return {
+    id: `egg${nextEggId++}`,
+    locationId,
+    parentEnclosureId,
+    speciesId,
+    rare,
+    remainingSec: BALANCE.hatchTimeSec,
+    ready: false,
+  };
 }
 
 export class Hatchery {
@@ -65,6 +72,7 @@ export class Hatchery {
       }
       if (egg.ready && this.stored.length < BALANCE.hatcheryCapacity) {
         const m = createMonster(egg.speciesId, { rare: egg.rare });
+        m.homeEnclosureId = egg.parentEnclosureId;
         this.stored.push(m);
         this.eggs.splice(this.eggs.indexOf(egg), 1);
         born.push(m);
@@ -91,8 +99,12 @@ export class Hatchery {
 
 export function placeMonsterInEnclosure(monster, enclosure) {
   if (SPECIES[monster.speciesId].habitat !== enclosure.habitat) return { ok: false, reason: 'wrongHabitat' };
-  if (enclosure.monsterId) return { ok: false, reason: 'occupied' };
-  enclosure.monsterId = monster.id;
+  if (enclosure.monsterIds.length && enclosure.speciesId && enclosure.speciesId !== monster.speciesId) {
+    return { ok: false, reason: 'otherSpecies' };
+  }
+  if (enclosure.monsterIds.length >= capacity(enclosure, monster.speciesId)) return { ok: false, reason: 'full' };
+  enclosure.monsterIds.push(monster.id);
+  enclosure.speciesId = monster.speciesId;
   monster.enclosureId = enclosure.id;
   monster.state = 'enclosed';
   monster.pos = enclosureCenter(enclosure);

@@ -4,6 +4,7 @@ import { BALANCE } from '../config/balance.js';
 import { SPECIES, LOCATIONS, HABITATS } from '../config/species.js';
 import { OBJECTIVES } from '../sim/objectives.js';
 import { monsterTextureKey } from './textures.js';
+import { capacity, canBreed } from '../sim/breeding.js';
 
 const TOOLS = [
   { type: 'select', label: 'tool.select', icon: 'visitor-0' },
@@ -192,9 +193,22 @@ class UI {
     if (sel.kind === 'enclosure') {
       const e = w.builder.enclosures.get(sel.id);
       if (!e) return null;
-      return `${close}<h3><img class="portrait" src="${this.img(`tile-${e.habitat}`)}">${esc(t('tool.enclosure'))} ${esc(t(`habitat.${e.habitat}`))}</h3>
-        <div class="row">${esc(t('enclosure.size', { n: e.area }))}</div>
-        <div class="row">${esc(t('enclosure.empty'))}</div>`;
+      const head = `${close}<h3><img class="portrait" src="${this.img(`tile-${e.habitat}`)}">${esc(t('tool.enclosure'))} ${esc(t(`habitat.${e.habitat}`))}</h3>
+        <div class="row">${esc(t('enclosure.size', { n: e.area }))}</div>`;
+      if (!e.monsterIds.length) return `${head}<div class="row">${esc(t('enclosure.empty'))}</div>`;
+      const max = capacity(e, e.speciesId);
+      const list = e.monsterIds.map((id) => w.monsters.get(id)).filter(Boolean).map((m) => `
+        <button data-action="open" data-id="${m.id}"><img src="${this.img(monsterTextureKey(m))}">
+          <span>${esc(this.monsterName(m))} · ${Math.round(m.happiness)} %${m.state === 'escaped' ? ' · ⚠' : ''}</span></button>`).join('');
+      const pending = w.hatchery.eggs.filter((egg) => egg.parentEnclosureId === e.id).length;
+      let nest;
+      if (pending) nest = `<div class="row">🥚 ${esc(t('enclosure.nestEgg'))}</div>`;
+      else if (canBreed(e, w.monsters, 0)) {
+        nest = `<div class="row">${esc(t('enclosure.nest', { s: Math.ceil(BALANCE.breedTimeSec - e.breedTimer) }))}${bar(100 * e.breedTimer / BALANCE.breedTimeSec)}</div>`;
+      } else if (e.monsterIds.length >= max) nest = `<div class="row">${esc(t('enclosure.nestFull'))}</div>`;
+      else nest = `<div class="row">${esc(t('enclosure.nestWaiting'))}</div>`;
+      return `${head}<div class="row">${esc(t('enclosure.places', { n: e.monsterIds.length, max }))}</div>
+        <div class="list">${list}</div>${nest}`;
     }
 
     if (sel.kind === 'building' && sel.type === 'expeditionBase') {
@@ -252,7 +266,10 @@ class UI {
     }
     if (action === 'place') {
       const m = w.monsters.get(id);
-      this.setTool({ type: 'placeMonster', monsterId: id, habitat: SPECIES[m.speciesId].habitat });
+      this.setTool({ type: 'placeMonster', monsterId: id, speciesId: m.speciesId, habitat: SPECIES[m.speciesId].habitat });
+    }
+    if (action === 'open') {
+      this.selection = { kind: 'monster', id };
     }
     this.refresh(true);
   }
@@ -293,6 +310,7 @@ class UI {
     if (e.type === 'eggReady') this.toast(t('event.eggReady'), 'good');
     if (e.type === 'hatched') this.toast(t('event.hatched', { name: name(e.speciesId, e.rare) }), 'good');
     if (e.type === 'objective') this.toast(t('event.objective', { name: t(`objective.${e.id}`) }), 'good');
+    if (e.type === 'laid') this.toast(t('event.laid', { name: name(e.speciesId) }), 'good');
     if (e.type === 'caught') this.toast(t('event.caught', { name: name(e.speciesId) }), 'good');
   }
 

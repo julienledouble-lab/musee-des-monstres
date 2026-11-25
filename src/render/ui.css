@@ -81,4 +81,4 @@ button small { display: block; font-size: 11px; opacity: 0.8; }
 .toast.good { background: #e3f9e5; }
 
 #hint { position: absolute; bottom: 92px; right: 14px; font-size: 13px; padding: 4px 10px; }
-#help { position: absolute; bottom: 14px; right: 14px; font-size: 12px; padding: 4px 10px; max-width: 220px; }
+#help { position: absolute; bottom: 14px; left: 14px; font-size: 12px; padding: 4px 10px; max-width: 220px; }
