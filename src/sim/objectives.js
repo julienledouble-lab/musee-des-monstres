@@ -4,10 +4,10 @@ export function speciesOwned(world) {
 
 // Shown in this order; checks receive the World.
 export const OBJECTIVES = [
-  { id: 'visitors10', check: (w) => w.totalVisitors >= 10 },
+  { id: 'visitors25', check: (w) => w.totalVisitors >= 25 },
   { id: 'species3', check: (w) => speciesOwned(w) >= 3 },
   { id: 'money10000', check: (w) => w.wallet.money >= 10000 },
-  { id: 'visitors50', check: (w) => w.totalVisitors >= 50 },
+  { id: 'visitors150', check: (w) => w.totalVisitors >= 150 },
   { id: 'allSpecies', check: (w) => speciesOwned(w) >= 5 },
 ];
 

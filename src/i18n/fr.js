@@ -87,9 +87,9 @@ export const fr = {
   'error.nothing': 'Rien à démolir ici',
 
   'objective.title': 'Objectifs',
-  'objective.visitors10': 'Accueillir 10 visiteurs',
+  'objective.visitors25': 'Accueillir 25 visiteurs',
   'objective.species3': 'Posséder 3 espèces',
   'objective.money10000': 'Avoir 10 000 pièces',
-  'objective.visitors50': 'Accueillir 50 visiteurs',
+  'objective.visitors150': 'Accueillir 150 visiteurs',
   'objective.allSpecies': 'Posséder les 5 espèces',
 };
