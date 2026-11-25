@@ -1,0 +1,84 @@
+:root {
+  --ink: #2b2d42;
+  --paper: #fffdf7;
+  --paper-2: #f4efe1;
+  --accent: #ff7b00;
+  --good: #2d6a4f;
+  --bad: #c1121f;
+  --radius: 14px;
+  font-family: 'Fredoka', 'Trebuchet MS', system-ui, sans-serif;
+}
+
+#ui { position: fixed; inset: 0; pointer-events: none; color: var(--ink); user-select: none; }
+#ui button, #ui .card { pointer-events: auto; }
+
+.card {
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 0 var(--ink);
+}
+
+button {
+  font: inherit;
+  color: var(--ink);
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  border-radius: 10px;
+  padding: 6px 10px;
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--ink);
+}
+button:hover { background: #fff3d6; }
+button:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
+button.active { background: var(--accent); color: #fff; }
+button small { display: block; font-size: 11px; opacity: 0.8; }
+
+#hud {
+  position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 14px; align-items: center; padding: 6px 14px; white-space: nowrap;
+}
+#hud .stat { font-size: 18px; font-weight: 600; }
+#hud .stars { color: #ffb703; font-size: 20px; letter-spacing: 1px; -webkit-text-stroke: 1px var(--ink); }
+#hud .group { display: flex; gap: 4px; align-items: center; }
+#hud button { padding: 2px 8px; }
+
+#objectives { position: absolute; top: 70px; left: 10px; padding: 10px 14px; width: 220px; font-size: 14px; }
+#objectives h3 { margin: 0 0 6px; font-size: 16px; }
+#objectives li { list-style: none; margin: 3px 0; }
+#objectives ul { margin: 0; padding: 0; }
+#objectives .done { color: var(--good); text-decoration: line-through; }
+
+#toolbar {
+  position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 6px; padding: 8px; pointer-events: auto;
+}
+#toolbar button { min-width: 74px; }
+
+#habitats {
+  position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%);
+  display: none; gap: 6px; padding: 8px;
+}
+#habitats.open { display: flex; }
+
+#panel { position: absolute; top: 70px; right: 10px; width: 270px; padding: 12px 14px; display: none; }
+#panel.open { display: block; }
+#panel h3 { margin: 0 0 8px; font-size: 18px; display: flex; align-items: center; gap: 8px; }
+#panel img.portrait { width: 48px; height: 48px; image-rendering: auto; }
+#panel .close { position: absolute; top: 6px; right: 8px; padding: 0 7px; box-shadow: none; border-width: 2px; }
+#panel .row { margin: 6px 0; font-size: 14px; }
+#panel .list button { display: flex; width: 100%; align-items: center; gap: 8px; margin: 5px 0; text-align: left; }
+#panel .list img { width: 32px; height: 32px; }
+
+.bar { height: 10px; border: 2px solid var(--ink); border-radius: 6px; background: var(--paper-2); overflow: hidden; margin-top: 3px; }
+.bar > div { height: 100%; background: var(--good); }
+.bar.warn > div { background: #f77f00; }
+.bar.bad > div { background: var(--bad); }
+
+#toasts { position: absolute; top: 70px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.toast { padding: 6px 14px; font-size: 15px; transition: opacity 0.4s; }
+.toast.error { background: #ffe5e5; }
+.toast.good { background: #e3f9e5; }
+
+#hint { position: absolute; bottom: 92px; right: 14px; font-size: 13px; padding: 4px 10px; }
+#help { position: absolute; bottom: 14px; right: 14px; font-size: 12px; padding: 4px 10px; max-width: 220px; }
