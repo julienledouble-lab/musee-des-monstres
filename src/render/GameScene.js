@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { tileToScreen, screenToTile } from '../sim/iso.js';
-import { generateTextures, monsterTextureKey } from './textures.js';
+import { generateTextures } from './textures.js';
+import { preloadSprites, resolveMonsterTexture } from './sprites.js';
 import { capacity } from '../sim/breeding.js';
 
 const GROUND_DEPTH = -1e6;
@@ -16,6 +17,10 @@ export class GameScene extends Phaser.Scene {
     this.world = world;
     this.ui = ui;
     this.tool = { type: 'select' };
+  }
+
+  preload() {
+    preloadSprites(this);
   }
 
   create() {
@@ -119,7 +124,12 @@ export class GameScene extends Phaser.Scene {
     for (const m of world.monsters.values()) {
       if (m.state === 'stored') continue;
       alive.add(m.id);
-      const entry = this.entry(m.id, 'monster', monsterTextureKey(m));
+      const look = resolveMonsterTexture(this, m);
+      const entry = this.entry(m.id, 'monster', look.key);
+      if (entry.sprite.texture.key !== look.key) entry.sprite.setTexture(look.key);
+      if (look.tint) entry.sprite.setTint(look.tint);
+      else entry.sprite.clearTint();
+      if (!entry.shadow) entry.shadow = this.add.image(0, 0, 'shadow');
       let x = m.pos.x, y = m.pos.y;
       if (m.state === 'enclosed') {
         const e = world.builder.enclosures.get(m.enclosureId);
@@ -132,12 +142,19 @@ export class GameScene extends Phaser.Scene {
         }
       }
       const p = tileToScreen(x, y);
-      const bob = Math.abs(Math.sin(time * 0.006 + entry.phase)) * 3;
-      entry.sprite.setFlipX(p.x < entry.lastX);
+      const bob = Math.abs(Math.sin(time * 0.006 + entry.phase)) * (look.real ? 1.2 : 3);
+      const dx = p.x - entry.lastX;
+      if (Math.abs(dx) > 0.05) {
+        // real images face left, procedural ones face the viewer: flip toward the walking direction
+        entry.sprite.setFlipX(look.real ? dx > 0 : dx < 0);
+      }
       entry.lastX = p.x;
       entry.sprite.setPosition(p.x, p.y + 8 - bob).setDepth(p.y);
-      entry.sprite.setScale(m.state === 'escaped' ? 1 + 0.08 * Math.sin(time * 0.02) : 1);
-      this.setBubble(entry, m.state === 'escaped' ? 'bubble-scared' : null, p, 58);
+      const pulse = m.state === 'escaped' ? 1 + 0.08 * Math.sin(time * 0.02) : 1;
+      entry.sprite.setScale(look.scale * pulse);
+      entry.shadow.setPosition(p.x, p.y + 6).setDepth(p.y - 0.5)
+        .setScale(look.real ? (entry.sprite.displayWidth / 64) * 0.9 : 0.7, look.real ? 0.9 : 0.7);
+      this.setBubble(entry, m.state === 'escaped' ? 'bubble-scared' : null, p, entry.sprite.displayHeight + 4);
     }
 
     for (const v of world.visitors) {
@@ -164,6 +181,7 @@ export class GameScene extends Phaser.Scene {
       if (alive.has(id)) continue;
       entry.sprite.destroy();
       if (entry.bubble) entry.bubble.destroy();
+      if (entry.shadow) entry.shadow.destroy();
       this.entitySprites.delete(id);
     }
   }

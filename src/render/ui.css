@@ -64,7 +64,8 @@ button small { display: block; font-size: 11px; opacity: 0.8; }
 #panel { position: absolute; top: 70px; right: 10px; width: 270px; padding: 12px 14px; display: none; }
 #panel.open { display: block; }
 #panel h3 { margin: 0 0 8px; font-size: 18px; display: flex; align-items: center; gap: 8px; }
-#panel img.portrait { width: 48px; height: 48px; image-rendering: auto; }
+#panel img.portrait { width: 48px; height: 48px; object-fit: contain; }
+#panel .list img { object-fit: contain; }
 #panel .close { position: absolute; top: 6px; right: 8px; padding: 0 7px; box-shadow: none; border-width: 2px; }
 #panel .row { margin: 6px 0; font-size: 14px; }
 #panel .list button { display: flex; width: 100%; align-items: center; gap: 8px; margin: 5px 0; text-align: left; }

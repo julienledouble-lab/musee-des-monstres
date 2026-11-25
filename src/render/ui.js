@@ -3,7 +3,7 @@ import { t } from '../i18n/index.js';
 import { BALANCE } from '../config/balance.js';
 import { SPECIES, LOCATIONS, HABITATS } from '../config/species.js';
 import { OBJECTIVES } from '../sim/objectives.js';
-import { monsterTextureKey } from './textures.js';
+import { resolveMonsterTexture } from './sprites.js';
 import { capacity, canBreed } from '../sim/breeding.js';
 
 const TOOLS = [
@@ -174,7 +174,7 @@ class UI {
         body = `<div class="row" style="color:var(--bad)">${esc(t('monster.escaped'))}</div>
           <button data-action="catch" data-id="${m.id}">${esc(t('monster.catch'))}</button>`;
       }
-      return `${close}<h3><img class="portrait" src="${this.img(monsterTextureKey(m))}">${esc(this.monsterName(m))}</h3>
+      return `${close}<h3><img class="portrait" src="${this.img(resolveMonsterTexture(this.scene, m).key)}">${esc(this.monsterName(m))}</h3>
         <div class="row">${esc(t('monster.habitat', { h: t(`habitat.${SPECIES[m.speciesId].habitat}`) }))}</div>
         <div class="row">${esc(t('monster.happiness', { n: Math.round(m.happiness) }))}${bar(m.happiness)}</div>
         <div class="row">${esc(t('monster.hunger', { n: Math.round(m.hunger) }))}${bar(m.hunger, true)}</div>
@@ -198,7 +198,7 @@ class UI {
       if (!e.monsterIds.length) return `${head}<div class="row">${esc(t('enclosure.empty'))}</div>`;
       const max = capacity(e, e.speciesId);
       const list = e.monsterIds.map((id) => w.monsters.get(id)).filter(Boolean).map((m) => `
-        <button data-action="open" data-id="${m.id}"><img src="${this.img(monsterTextureKey(m))}">
+        <button data-action="open" data-id="${m.id}"><img src="${this.img(resolveMonsterTexture(this.scene, m).key)}">
           <span>${esc(this.monsterName(m))} · ${Math.round(m.happiness)} %${m.state === 'escaped' ? ' · ⚠' : ''}</span></button>`).join('');
       const pending = w.hatchery.eggs.filter((egg) => egg.parentEnclosureId === e.id).length;
       let nest;
@@ -232,7 +232,7 @@ class UI {
       const eggs = h.eggs.map((egg) => `<div class="row"><img src="${this.img('egg')}" height="20"> ${
         egg.ready ? esc(t('hatchery.eggReady')) : esc(t('hatchery.egg', { place: t(`location.${egg.locationId}`), s: Math.ceil(egg.remainingSec) }))}</div>`).join('');
       const stored = h.stored.map((m) => `
-        <button data-action="place" data-id="${m.id}"><img src="${this.img(monsterTextureKey(m))}"><span>${esc(this.monsterName(m))} — ${esc(t('hatchery.place'))}</span></button>`).join('');
+        <button data-action="place" data-id="${m.id}"><img src="${this.img(resolveMonsterTexture(this.scene, m).key)}"><span>${esc(this.monsterName(m))} — ${esc(t('hatchery.place'))}</span></button>`).join('');
       return `${close}<h3><img class="portrait" src="${this.img('hatchery')}">${esc(t('building.hatchery'))}</h3>
         ${eggs || (h.stored.length ? '' : `<div class="row">${esc(t('hatchery.empty'))}</div>`)}
         <div class="row">${esc(t('hatchery.stored', { n: h.stored.length, max: BALANCE.hatcheryCapacity }))}</div>

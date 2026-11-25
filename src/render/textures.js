@@ -174,6 +174,13 @@ export function generateTextures(scene) {
       g.fillEllipse(40, 20, 8, 3);
     });
   }
+  // soft ground shadow under monsters (64 x 24)
+  tex(scene, 'shadow', 64, 24, (g) => {
+    for (let i = 6; i >= 1; i--) {
+      g.fillStyle(0x000000, 0.06);
+      g.fillEllipse(32, 12, 10 * i, 4 * i);
+    }
+  });
   tex(scene, 'tile-entrance', 64, 32, (g) => {
     diamond(g, 0xffd166, 0xbc8a5f);
   });

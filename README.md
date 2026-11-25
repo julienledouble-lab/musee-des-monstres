@@ -14,7 +14,7 @@ npm install
 npm run dev
 ```
 
-Puis ouvre l'adresse affichée (en général http://localhost:5173).
+Puis ouvre l'adresse affichée (http://localhost:5180).
 
 ## Commandes
 
