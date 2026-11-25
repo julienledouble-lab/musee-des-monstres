@@ -1,5 +1,5 @@
 import { BALANCE } from '../config/balance.js';
-import { findPath } from './pathfinding.js';
+import { findPath, findNearest } from './pathfinding.js';
 import { scare } from './visitors.js';
 
 const MONSTER_SPEED = 1;
@@ -98,7 +98,7 @@ export function returnMonster(monster, ctx) {
   }
   monster.state = 'stored';
   monster.enclosureId = null;
-  ctx.storeMonster(monster);
+  ctx.storeMonster(monster, { force: true });
 }
 
 export function catchByClick(monster, ctx) {
@@ -145,7 +145,10 @@ export function updateKeeper(k, ctx, dt) {
     return;
   }
 
-  // patrol: random walk on path tiles
+  // patrol: random walk on path tiles; if standing on grass, walk back to the nearest path
+  if ((!k.path || k.path.length === 0) && !ctx.grid.isPath(k.tile.tx, k.tile.ty)) {
+    k.path = findNearest(ctx.grid, k.tile, (x, y) => ctx.grid.isPath(x, y)) || [];
+  }
   if (!k.path || k.path.length === 0) {
     const options = ctx.grid.neighbors4(k.tile.tx, k.tile.ty).filter((n) => ctx.grid.isPath(n.tx, n.ty));
     k.path = options.length ? [options[Math.floor(ctx.rng() * options.length)]] : [];

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createInitialWorld } from '../../src/sim/world.js';
 import { computeReputation } from '../../src/sim/reputation.js';
 import { createMonster } from '../../src/sim/monsters.js';
+import { escapeMonster } from '../../src/sim/staff.js';
 
 function snapshot(w) {
   return JSON.stringify({
@@ -104,6 +105,33 @@ describe('World.tick', () => {
     w.placeStoredMonster(golem.id, r.id);
     for (let i = 0; i < 3; i++) w.hatchery.storeMonster(createMonster('yeti'));
     expect(w.builder.demolish(24, 30)).toEqual({ ok: false, reason: 'enclosureNotEmpty' });
+  });
+
+  it('review #1: the entrance tile cannot be demolished', () => {
+    const w = createInitialWorld();
+    expect(w.builder.demolish(20, 39)).toEqual({ ok: false, reason: 'notDemolishable' });
+    expect(w.grid.isPath(20, 39)).toBe(true);
+  });
+
+  it('review #2: a caught monster with no enclosure is never lost, even if the hatchery is full', () => {
+    const w = createInitialWorld();
+    const golem = [...w.monsters.values()][0];
+    const e = w.builder.enclosures.get(golem.enclosureId);
+    golem.happiness = 0;
+    escapeMonster(golem, e, w.grid);
+    expect(w.builder.demolish(e.x0, e.y0).ok).toBe(true);
+    for (let i = 0; i < 3; i++) w.hatchery.storeMonster(createMonster('yeti'));
+    w.catchMonster(golem.id);
+    expect(w.hatchery.stored).toContain(golem);
+  });
+
+  it('review #4: cannot build on an escaped monster', () => {
+    const w = createInitialWorld();
+    const golem = [...w.monsters.values()][0];
+    escapeMonster(golem, w.builder.enclosures.get(golem.enclosureId), w.grid);
+    const { x, y } = golem.pos;
+    expect(w.builder.placeBuilding('decoration', x, y)).toEqual({ ok: false, reason: 'occupied' });
+    expect(w.builder.placeEnclosure(x, y, x + 1, y + 1, 'lava')).toEqual({ ok: false, reason: 'occupied' });
   });
 
   it('feedMonster costs 20 and resets hunger', () => {

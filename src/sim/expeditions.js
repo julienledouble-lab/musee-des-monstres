@@ -73,8 +73,9 @@ export class Hatchery {
     return born;
   }
 
-  storeMonster(monster) {
-    if (this.stored.length >= BALANCE.hatcheryCapacity) return false;
+  // force: accept even when full (a caught monster with no enclosure must never be lost).
+  storeMonster(monster, { force = false } = {}) {
+    if (!force && this.stored.length >= BALANCE.hatcheryCapacity) return false;
     monster.state = 'stored';
     monster.enclosureId = null;
     this.stored.push(monster);

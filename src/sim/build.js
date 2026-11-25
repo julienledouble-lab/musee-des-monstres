@@ -20,6 +20,10 @@ export class Builder {
     // Set by World: called with the monster id when its enclosure is demolished.
     // Must return true if the monster could be moved away.
     this.onEnclosureEmptied = () => true;
+    // Set by World: true when a moving entity (escaped monster) stands on the tile.
+    this.isBlocked = () => false;
+    // "tx,ty" of path tiles that cannot be demolished (the entrance).
+    this.protectedTiles = new Set();
   }
 
   placePath(tx, ty) {
@@ -81,6 +85,7 @@ export class Builder {
       return { ok: true, id };
     }
     if (tile.ground === 'path') {
+      if (this.protectedTiles.has(`${tx},${ty}`)) return fail('notDemolishable');
       this.grid.setGround(tx, ty, 'grass');
       this.wallet.earn(BALANCE.pathCost * BALANCE.demolishRefund);
       return { ok: true };
@@ -117,7 +122,9 @@ export class Builder {
   }
 
   #rectFree(x0, y0, x1, y1) {
-    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (!this.grid.isFree(x, y)) return false;
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) if (!this.grid.isFree(x, y) || this.isBlocked(x, y)) return false;
+    }
     return true;
   }
 

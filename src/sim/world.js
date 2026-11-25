@@ -38,6 +38,15 @@ export class World {
     this.completedObjectives = new Set();
     this.events = [];
     this.builder.onEnclosureEmptied = (monsterId) => this.#onEnclosureEmptied(monsterId);
+    this.builder.isBlocked = (x, y) => {
+      for (const m of this.monsters.values()) {
+        if (m.state !== 'escaped') continue;
+        if (m.tile.tx === x && m.tile.ty === y) return true;
+        if (m.wanderTarget && m.wanderTarget.tx === x && m.wanderTarget.ty === y) return true;
+      }
+      return false;
+    };
+    this.builder.protectedTiles.add(`${this.entrance.tx},${this.entrance.ty}`);
     this.ctx = {
       grid: this.grid,
       builder: this.builder,
@@ -47,7 +56,7 @@ export class World {
       entrance: this.entrance,
       wallet: this.wallet,
       rng: this.rng,
-      storeMonster: (m) => this.hatchery.storeMonster(m),
+      storeMonster: (m, opts) => this.hatchery.storeMonster(m, opts),
     };
   }
 

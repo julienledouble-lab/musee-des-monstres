@@ -87,6 +87,15 @@ describe('staff', () => {
     expect(ctx.keepers[1].targetMonsterId).toBeNull();
   });
 
+  it('review #3: a patrolling keeper on grass walks back to a path', () => {
+    const { ctx } = setup();
+    for (let x = 0; x < 20; x++) ctx.builder.placePath(x, 15);
+    hireKeeper(ctx.keepers, ctx.wallet, { tx: 3, ty: 8 });
+    for (let i = 0; i < 200; i++) updateKeeper(ctx.keepers[0], ctx, 0.1);
+    const k = ctx.keepers[0];
+    expect(ctx.grid.isPath(k.tile.tx, k.tile.ty)).toBe(true);
+  });
+
   it('catchByClick returns the monster with +20 happiness', () => {
     const { ctx, m, enclosure } = setup();
     escapeMonster(m, enclosure, ctx.grid);

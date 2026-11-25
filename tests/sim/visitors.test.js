@@ -101,6 +101,17 @@ describe('visitors', () => {
     expect(v.state).toBe('gone');
   });
 
+  it('review #1: demolishing the exact tile a visitor heads to does not freeze it', () => {
+    const ctx = setup();
+    addEnclosure(ctx, 8, 8, 9, 9);
+    const v = createVisitor(ctx.entrance);
+    run(v, ctx, 1);
+    const goal = v.target.tile;
+    ctx.builder.demolish(goal.tx, goal.ty);
+    const t = run(v, ctx, 60, (x) => x.state === 'gone' || x.state === 'watching');
+    expect(t).not.toBeNull();
+  });
+
   it('a hungry visitor goes to the snack and pays 8', () => {
     const ctx = setup();
     ctx.builder.placeBuilding('snack', 5, 9);
