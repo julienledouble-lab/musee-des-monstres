@@ -1,0 +1,127 @@
+import { BALANCE } from '../config/balance.js';
+
+const BUILDING_DEFS = {
+  decoration: { size: 1, price: BALANCE.decorationCost },
+  snack: { size: 1, price: BALANCE.snackCost },
+  souvenir: { size: 1, price: BALANCE.souvenirCost },
+  expeditionBase: { size: 2, price: 0 },
+  hatchery: { size: 2, price: 0 },
+};
+
+const fail = (reason) => ({ ok: false, reason });
+
+export class Builder {
+  constructor(grid, wallet) {
+    this.grid = grid;
+    this.wallet = wallet;
+    this.enclosures = new Map();
+    this.buildings = new Map();
+    this.nextId = 1;
+    // Set by World: called with the monster id when its enclosure is demolished.
+    // Must return true if the monster could be moved away.
+    this.onEnclosureEmptied = () => true;
+  }
+
+  placePath(tx, ty) {
+    if (!this.grid.inBounds(tx, ty)) return fail('outOfBounds');
+    if (!this.grid.isFree(tx, ty)) return fail('occupied');
+    if (!this.wallet.spend(BALANCE.pathCost)) return fail('noMoney');
+    this.grid.setGround(tx, ty, 'path');
+    return { ok: true };
+  }
+
+  placeEnclosure(ax, ay, bx, by, habitat) {
+    const x0 = Math.min(ax, bx), x1 = Math.max(ax, bx);
+    const y0 = Math.min(ay, by), y1 = Math.max(ay, by);
+    if (!this.grid.inBounds(x0, y0) || !this.grid.inBounds(x1, y1)) return fail('outOfBounds');
+    if (x1 - x0 < 1 || y1 - y0 < 1) return fail('tooSmall');
+    if (!this.#rectFree(x0, y0, x1, y1)) return fail('occupied');
+    const area = (x1 - x0 + 1) * (y1 - y0 + 1);
+    const price = area * BALANCE.enclosureCostPerTile;
+    if (!this.wallet.spend(price)) return fail('noMoney');
+    const id = `enc${this.nextId++}`;
+    this.enclosures.set(id, { id, x0, y0, x1, y1, habitat, area, price, monsterId: null });
+    this.#fillRect(x0, y0, x1, y1, id);
+    return { ok: true, id };
+  }
+
+  // opts.free: no cost (initial world); opts.fixed: cannot be demolished.
+  placeBuilding(type, tx, ty, opts = {}) {
+    const def = BUILDING_DEFS[type];
+    const x1 = tx + def.size - 1, y1 = ty + def.size - 1;
+    if (!this.grid.inBounds(tx, ty) || !this.grid.inBounds(x1, y1)) return fail('outOfBounds');
+    if (!this.#rectFree(tx, ty, x1, y1)) return fail('occupied');
+    const price = opts.free ? 0 : def.price;
+    if (!this.wallet.spend(price)) return fail('noMoney');
+    const id = `${type}${this.nextId++}`;
+    this.buildings.set(id, { id, type, x0: tx, y0: ty, x1, y1, price, fixed: !!opts.fixed });
+    this.#fillRect(tx, ty, x1, y1, id);
+    return { ok: true, id };
+  }
+
+  demolish(tx, ty) {
+    const tile = this.grid.getTile(tx, ty);
+    if (!tile) return fail('outOfBounds');
+    const id = tile.occupant;
+    if (id && this.enclosures.has(id)) {
+      const e = this.enclosures.get(id);
+      if (e.monsterId && !this.onEnclosureEmptied(e.monsterId)) return fail('enclosureNotEmpty');
+      e.monsterId = null;
+      this.enclosures.delete(id);
+      this.#fillRect(e.x0, e.y0, e.x1, e.y1, null);
+      this.wallet.earn(e.price * BALANCE.demolishRefund);
+      return { ok: true, id };
+    }
+    if (id && this.buildings.has(id)) {
+      const b = this.buildings.get(id);
+      if (b.fixed) return fail('notDemolishable');
+      this.buildings.delete(id);
+      this.#fillRect(b.x0, b.y0, b.x1, b.y1, null);
+      this.wallet.earn(b.price * BALANCE.demolishRefund);
+      return { ok: true, id };
+    }
+    if (tile.ground === 'path') {
+      this.grid.setGround(tx, ty, 'grass');
+      this.wallet.earn(BALANCE.pathCost * BALANCE.demolishRefund);
+      return { ok: true };
+    }
+    return fail('nothing');
+  }
+
+  entity(id) {
+    return this.enclosures.get(id) || this.buildings.get(id) || null;
+  }
+
+  // Path tiles adjacent to the entity, in row order.
+  accessTiles(id) {
+    const e = this.entity(id);
+    if (!e) return [];
+    const out = [];
+    const seen = new Set();
+    for (let y = e.y0 - 1; y <= e.y1 + 1; y++) {
+      for (let x = e.x0 - 1; x <= e.x1 + 1; x++) {
+        const inside = x >= e.x0 && x <= e.x1 && y >= e.y0 && y <= e.y1;
+        const corner = (x < e.x0 || x > e.x1) && (y < e.y0 || y > e.y1);
+        if (inside || corner) continue;
+        if (this.grid.isPath(x, y) && !seen.has(`${x},${y}`)) {
+          seen.add(`${x},${y}`);
+          out.push({ tx: x, ty: y });
+        }
+      }
+    }
+    return out.sort((a, b) => a.tx - b.tx || a.ty - b.ty);
+  }
+
+  touchesPath(id) {
+    return this.accessTiles(id).length > 0;
+  }
+
+  #rectFree(x0, y0, x1, y1) {
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (!this.grid.isFree(x, y)) return false;
+    return true;
+  }
+
+  #fillRect(x0, y0, x1, y1, id) {
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) this.grid.setOccupant(x, y, id);
+  }
+}
