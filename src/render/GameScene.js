@@ -3,7 +3,11 @@ import { tileToScreen, screenToTile } from '../sim/iso.js';
 import { generateTextures } from './textures.js';
 import {
   preloadSprites, resolveMonsterTexture, realKey, directionIndex, DIRECTIONAL_ORIGIN_Y,
+  createAnimations, hasAnimation,
 } from './sprites.js';
+
+const WANDER_SPEED = 0.7; // tiles per second of game time, matches the walk cycle
+const WANDER_PAUSE = [2, 5]; // seconds of rest between two walks
 import { capacity } from '../sim/breeding.js';
 
 const GROUND_DEPTH = -1e6;
@@ -28,6 +32,7 @@ export class GameScene extends Phaser.Scene {
 
   create() {
     generateTextures(this);
+    createAnimations(this);
     const { grid } = this.world;
 
     this.tileImages = [];
@@ -72,7 +77,7 @@ export class GameScene extends Phaser.Scene {
       this.lastGridVersion = this.world.grid.version;
       this.redrawGround();
     }
-    this.syncEntities(time);
+    this.syncEntities(time, Math.min(delta / 1000, 0.1) * this.world.speed);
     this.moveCameraWithKeys(delta);
     this.ui.update();
   }
@@ -144,7 +149,37 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  syncEntities(time) {
+  // Visual-only stroll of an enclosed monster: walk to a random point, rest, repeat.
+  // Returns the drawn position (tile units).
+  wanderInEnclosure(entry, e, dt) {
+    const minX = e.x0 - 0.2, maxX = e.x1 + 0.2, minY = e.y0 - 0.2, maxY = e.y1 + 0.2;
+    if (entry.wx === undefined || entry.wEnc !== e.id) {
+      entry.wEnc = e.id;
+      entry.wx = minX + Math.random() * (maxX - minX);
+      entry.wy = minY + Math.random() * (maxY - minY);
+      entry.goal = null;
+      entry.rest = Math.random() * WANDER_PAUSE[1];
+    }
+    if (entry.rest > 0) {
+      entry.rest -= dt;
+      if (entry.rest <= 0) entry.goal = { x: minX + Math.random() * (maxX - minX), y: minY + Math.random() * (maxY - minY) };
+    } else if (entry.goal) {
+      const dx = entry.goal.x - entry.wx, dy = entry.goal.y - entry.wy;
+      const d = Math.hypot(dx, dy), step = WANDER_SPEED * dt;
+      if (d <= step) {
+        entry.wx = entry.goal.x;
+        entry.wy = entry.goal.y;
+        entry.goal = null;
+        entry.rest = WANDER_PAUSE[0] + Math.random() * (WANDER_PAUSE[1] - WANDER_PAUSE[0]);
+      } else {
+        entry.wx += (dx / d) * step;
+        entry.wy += (dy / d) * step;
+      }
+    }
+    return { x: entry.wx, y: entry.wy };
+  }
+
+  syncEntities(time, dt = 0) {
     const { world } = this;
     const alive = new Set();
 
@@ -153,21 +188,21 @@ export class GameScene extends Phaser.Scene {
       alive.add(m.id);
       const entry0 = this.entitySprites.get(m.id);
       const look = resolveMonsterTexture(this, m, entry0 ? entry0.dir : 0);
+      const animated = look.directional && hasAnimation(this, m.speciesId);
       const entry = this.entry(m.id, 'monster', look.key);
-      if (entry.sprite.texture.key !== look.key) entry.sprite.setTexture(look.key);
+      if (!animated && entry.sprite.texture.key !== look.key) {
+        entry.sprite.stop();
+        entry.sprite.setTexture(look.key);
+      }
       if (look.tint) entry.sprite.setTint(look.tint);
       else entry.sprite.clearTint();
       if (!entry.shadow) entry.shadow = this.add.image(0, 0, 'shadow');
       let x = m.pos.x, y = m.pos.y;
       if (m.state === 'enclosed') {
         const e = world.builder.enclosures.get(m.enclosureId);
-        if (e) {
-          const phase = entry.phase;
-          const hx = Math.max(0, (e.x1 - e.x0) / 2 - 0.2);
-          const hy = Math.max(0, (e.y1 - e.y0) / 2 - 0.2);
-          x += Math.sin(time * 0.0004 + phase) * hx;
-          y += Math.sin(time * 0.00031 + phase * 2) * hy;
-        }
+        if (e) ({ x, y } = this.wanderInEnclosure(entry, e, dt));
+      } else {
+        entry.wx = undefined;
       }
       const p = tileToScreen(x, y);
       // turn toward the walking direction (tile-space movement since last frame)
@@ -175,9 +210,22 @@ export class GameScene extends Phaser.Scene {
       entry.lastTX = x;
       entry.lastTY = y;
       const moving = Math.hypot(mdx, mdy) > 0.0015;
+      if (moving) entry.walkUntil = time + 250; // short grace so tiny stops don't flicker to idle
       if (look.directional) {
         if (moving) entry.dir = directionIndex(mdx, mdy);
         entry.sprite.setFlipX(false).setOrigin(0.5, DIRECTIONAL_ORIGIN_Y);
+        if (animated) {
+          const kind = time < (entry.walkUntil || 0) ? 'walk' : 'idle';
+          const key = `${m.speciesId}-${kind}-d${entry.dir}`;
+          const cur = entry.sprite.anims.currentAnim;
+          if (!cur || cur.key !== key) {
+            // keep the stride going when only the direction changes
+            const sameKind = cur && cur.key.includes(`-${kind}-`);
+            const frame = sameKind ? entry.sprite.anims.currentFrame.index - 1 : 0;
+            entry.sprite.play({ key, startFrame: frame });
+          }
+          entry.sprite.anims.timeScale = world.speed || 0.0001;
+        }
       } else {
         const dx = p.x - entry.lastX;
         // single real images face left, procedural ones face the viewer: flip toward the walking direction
@@ -185,7 +233,7 @@ export class GameScene extends Phaser.Scene {
         entry.sprite.setOrigin(0.5, 1);
       }
       entry.lastX = p.x;
-      const bob = Math.abs(Math.sin(time * 0.006 + entry.phase)) * (look.real ? 1.2 : 3);
+      const bob = animated ? 0 : Math.abs(Math.sin(time * 0.006 + entry.phase)) * (look.real ? 1.2 : 3);
       entry.sprite.setPosition(p.x, p.y + (look.directional ? 0 : 8) - bob).setDepth(p.y);
       const pulse = m.state === 'escaped' ? 1 + 0.08 * Math.sin(time * 0.02) : 1;
       entry.sprite.setScale(look.scale * pulse);
@@ -229,7 +277,7 @@ export class GameScene extends Phaser.Scene {
   entry(id, kind, texture) {
     let e = this.entitySprites.get(id);
     if (!e) {
-      const sprite = this.add.image(0, 0, texture).setOrigin(0.5, 1);
+      const sprite = this.add.sprite(0, 0, texture).setOrigin(0.5, 1);
       e = { sprite, bubble: null, kind, phase: Math.random() * 10, lastX: 0, dir: 0 };
       this.entitySprites.set(id, e);
     }

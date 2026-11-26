@@ -19,9 +19,38 @@ export const DECOR_URLS = Object.fromEntries(
   Object.entries(decor).map(([path, url]) => [path.split('/').pop().replace('.png', ''), url]),
 );
 
+// Animated 3D models: horizontal strips of 256 px frames, "<speciesId>-<walk|idle>-d<0..7>.png".
+const animFiles = import.meta.glob('../assets/anims/*.png', { eager: true, query: '?url', import: 'default' });
+export const ANIM_URLS = Object.fromEntries(
+  Object.entries(animFiles).map(([path, url]) => [path.split('/').pop().replace('.png', ''), url]),
+);
+// Playback speed of each animation (frames per second of the sampled strip).
+const ANIM_FPS = { walk: 8, idle: 3 };
+
 export function preloadSprites(scene) {
   for (const [name, url] of Object.entries(SPRITE_URLS)) scene.load.image(`real-${name}`, url);
   for (const [name, url] of Object.entries(DECOR_URLS)) scene.load.image(`img-${name}`, url);
+  for (const [name, url] of Object.entries(ANIM_URLS)) {
+    scene.load.spritesheet(`anim-${name}`, url, { frameWidth: 256, frameHeight: 256 });
+  }
+}
+
+// Called once after loading: one looping Phaser animation per strip (same key as the strip).
+export function createAnimations(scene) {
+  for (const name of Object.keys(ANIM_URLS)) {
+    const kind = name.includes('-walk-') ? 'walk' : 'idle';
+    if (scene.anims.exists(name)) continue;
+    scene.anims.create({
+      key: name,
+      frames: scene.anims.generateFrameNumbers(`anim-${name}`),
+      frameRate: ANIM_FPS[kind],
+      repeat: -1,
+    });
+  }
+}
+
+export function hasAnimation(scene, speciesId) {
+  return scene.anims.exists(`${speciesId}-walk-d0`) && scene.anims.exists(`${speciesId}-idle-d0`);
 }
 
 // The realistic version of a procedural texture key if one was loaded, else the key itself.
