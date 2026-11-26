@@ -73,8 +73,9 @@ export class GameScene extends Phaser.Scene {
       for (let tx = -RING; tx < grid.w + RING; tx++) {
         if (grid.inBounds(tx, ty)) continue;
         const p = tileToScreen(tx, ty);
-        const key = realKey(this, (tx * 7 + ty * 13) % 5 === 0 ? 'tile-grass2' : 'tile-grass');
+        const key = realKey(this, this.grassKey(tx, ty));
         this.add.image(p.x, p.y, key).setDisplaySize(66, 33).setDepth(GROUND_DEPTH);
+        this.addGrassDetail(tx, ty, null);
       }
     }
     // forest edge: trees on every other cell of the ring, denser further out
@@ -96,6 +97,35 @@ export class GameScene extends Phaser.Scene {
       const c = tileToScreen(entrance.tx, entrance.ty);
       this.add.image(c.x, c.y + 16, 'img-prop-gate').setOrigin(0.5, 1).setDisplaySize(64, 128).setDepth(c.y + 1);
     }
+  }
+
+  // Stable pseudo-random number for a tile (same tile -> same value every time).
+  static tileHash(tx, ty, salt = 0) {
+    let h = (Math.imul(tx + 1000, 73856093) ^ Math.imul(ty + 1000, 19349663) ^ Math.imul(salt, 83492791)) >>> 0;
+    h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0;
+    return (h % 10000) / 10000;
+  }
+
+  // One of the realistic grass variants (procedural fallback when renders are missing).
+  grassKey(tx, ty) {
+    if (!this.grassVariants) {
+      this.grassVariants = ['tile-grass', 'tile-grass2', 'tile-grass3', 'tile-grass4'].filter((k) => this.textures.exists(`img-${k}`));
+    }
+    if (!this.grassVariants.length) return (tx * 7 + ty * 13) % 5 === 0 ? 'tile-grass2' : 'tile-grass';
+    return this.grassVariants[Math.floor(GameScene.tileHash(tx, ty) * this.grassVariants.length)];
+  }
+
+  // A small tuft, wild flowers or pebbles on some grass tiles, to break the flat lawn.
+  addGrassDetail(tx, ty, list) {
+    if (GameScene.tileHash(tx, ty, 1) > 0.22) return;
+    const kinds = ['img-grass-tuft', 'img-grass-tuft', 'img-grass-tuftDry', 'img-grass-wildflowers', 'img-grass-pebbles'];
+    const key = kinds[Math.floor(GameScene.tileHash(tx, ty, 2) * kinds.length)];
+    if (!this.textures.exists(key)) return;
+    const jx = (GameScene.tileHash(tx, ty, 3) - 0.5) * 0.6, jy = (GameScene.tileHash(tx, ty, 4) - 0.5) * 0.6;
+    const c = tileToScreen(tx + jx, ty + jy);
+    const s = 0.55 + GameScene.tileHash(tx, ty, 5) * 0.4;
+    const img = this.add.image(c.x, c.y, key).setDisplaySize(64 * s, 64 * s).setDepth(c.y - 2);
+    if (list) list.push(img);
   }
 
   setTool(tool) {
@@ -127,7 +157,7 @@ export class GameScene extends Phaser.Scene {
     for (let ty = 0; ty < grid.h; ty++) {
       for (let tx = 0; tx < grid.w; tx++) {
         const t = grid.getTile(tx, ty);
-        let key = (tx * 7 + ty * 13) % 5 === 0 ? 'tile-grass2' : 'tile-grass';
+        let key = this.grassKey(tx, ty);
         if (t.ground === 'path') key = tx === this.world.entrance.tx && ty === this.world.entrance.ty ? 'tile-entrance' : 'tile-path';
         const enc = t.occupant && builder.enclosures.get(t.occupant);
         if (enc) key = `tile-${enc.habitat}`;
@@ -135,6 +165,15 @@ export class GameScene extends Phaser.Scene {
         const rk = realKey(this, key);
         // real tiles have soft anti-aliased edges: overlap them by a pixel so no seam shows
         img.setTexture(rk).setDisplaySize(rk === key ? 64 : 66, rk === key ? 32 : 33);
+      }
+    }
+
+    // grass details only on free lawn tiles (removed under paths, enclosures and buildings)
+    for (const d of this.grassDetails || []) d.destroy();
+    this.grassDetails = [];
+    for (let ty = 0; ty < grid.h; ty++) {
+      for (let tx = 0; tx < grid.w; tx++) {
+        if (grid.isFree(tx, ty)) this.addGrassDetail(tx, ty, this.grassDetails);
       }
     }
 
