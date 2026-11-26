@@ -11,6 +11,8 @@ const game = new Phaser.Game({
   parent: 'game',
   backgroundColor: '#8ecae6',
   scale: { mode: Phaser.Scale.RESIZE, width: window.innerWidth, height: window.innerHeight },
+  // load every image in one batch (the queue otherwise waits for game-loop ticks between batches)
+  loader: { maxParallelDownloads: 64 },
   scene: [new GameScene(world, ui)],
 });
 

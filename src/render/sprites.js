@@ -12,8 +12,24 @@ export const SPRITE_SCALE = { dragonnet: 0.42, kraken: 0.4, spectre: 0.38, golem
 // Tint used for a rare monster when only the normal image exists.
 export const RARE_FALLBACK_TINT = 0xffd36b;
 
+// Realistic ground tiles and buildings rendered in Blender (2x the in-game size).
+// Their file name is the procedural texture key they replace: tile-grass.png, bld-snack.png...
+const decor = import.meta.glob(['../assets/tiles/*.png', '../assets/buildings/*.png'], { eager: true, query: '?url', import: 'default' });
+export const DECOR_URLS = Object.fromEntries(
+  Object.entries(decor).map(([path, url]) => [path.split('/').pop().replace('.png', ''), url]),
+);
+
 export function preloadSprites(scene) {
   for (const [name, url] of Object.entries(SPRITE_URLS)) scene.load.image(`real-${name}`, url);
+  for (const [name, url] of Object.entries(DECOR_URLS)) scene.load.image(`img-${name}`, url);
+}
+
+// The realistic version of a procedural texture key if one was loaded, else the key itself.
+// Buildings are looked up as "bld-<type>".
+export function realKey(scene, key) {
+  if (scene.textures.exists(`img-${key}`)) return `img-${key}`;
+  if (scene.textures.exists(`img-bld-${key}`)) return `img-bld-${key}`;
+  return key;
 }
 
 // Which texture to draw a monster with: { key, tint, real, scale }.

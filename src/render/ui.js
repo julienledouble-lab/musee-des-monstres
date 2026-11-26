@@ -3,7 +3,7 @@ import { t } from '../i18n/index.js';
 import { BALANCE } from '../config/balance.js';
 import { SPECIES, LOCATIONS, HABITATS } from '../config/species.js';
 import { OBJECTIVES } from '../sim/objectives.js';
-import { resolveMonsterTexture } from './sprites.js';
+import { resolveMonsterTexture, realKey } from './sprites.js';
 import { capacity, canBreed } from '../sim/breeding.js';
 
 const TOOLS = [
@@ -69,7 +69,8 @@ class UI {
     this.refresh(true);
   }
 
-  img(key) {
+  img(rawKey) {
+    const key = realKey(this.scene, rawKey); // prefer the realistic Blender render
     if (!this.imgCache.has(key)) this.imgCache.set(key, this.scene.textures.getBase64(key));
     return this.imgCache.get(key);
   }

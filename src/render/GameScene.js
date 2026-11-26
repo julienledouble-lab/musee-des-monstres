@@ -1,13 +1,14 @@
 import Phaser from 'phaser';
 import { tileToScreen, screenToTile } from '../sim/iso.js';
 import { generateTextures } from './textures.js';
-import { preloadSprites, resolveMonsterTexture } from './sprites.js';
+import { preloadSprites, resolveMonsterTexture, realKey } from './sprites.js';
 import { capacity } from '../sim/breeding.js';
 
 const GROUND_DEPTH = -1e6;
 const FENCE_DEPTH = -5e5;
 const GHOST_DEPTH = 1e6;
-const FENCE_COLOR = 0x6f4518;
+const FENCE_COLOR = 0x8a6038;
+const FENCE_SHADE = 0x3e2a17;
 
 // Draws the World and turns pointer input into World / Builder calls.
 // The current tool is set by the DOM UI through setTool().
@@ -83,20 +84,36 @@ export class GameScene extends Phaser.Scene {
         if (t.ground === 'path') key = tx === this.world.entrance.tx && ty === this.world.entrance.ty ? 'tile-entrance' : 'tile-path';
         const enc = t.occupant && builder.enclosures.get(t.occupant);
         if (enc) key = `tile-${enc.habitat}`;
-        this.tileImages[ty * grid.w + tx].setTexture(key);
+        const img = this.tileImages[ty * grid.w + tx];
+        const rk = realKey(this, key);
+        // real tiles have soft anti-aliased edges: overlap them by a pixel so no seam shows
+        img.setTexture(rk).setDisplaySize(rk === key ? 64 : 66, rk === key ? 32 : 33);
       }
     }
 
+    // wooden fence: a post at every tile corner and two rails between posts
     this.fences.clear();
+    const f = this.fences;
     for (const e of builder.enclosures.values()) {
-      const c = [
-        tileToScreen(e.x0 - 0.5, e.y0 - 0.5), tileToScreen(e.x1 + 0.5, e.y0 - 0.5),
-        tileToScreen(e.x1 + 0.5, e.y1 + 0.5), tileToScreen(e.x0 - 0.5, e.y1 + 0.5),
-      ];
-      this.fences.lineStyle(5, FENCE_COLOR, 1);
-      this.fences.strokePoints(c, true);
-      this.fences.fillStyle(FENCE_COLOR, 1);
-      for (const p of c) this.fences.fillRect(p.x - 3, p.y - 10, 6, 12);
+      const corners = [[e.x0 - 0.5, e.y0 - 0.5], [e.x1 + 0.5, e.y0 - 0.5], [e.x1 + 0.5, e.y1 + 0.5], [e.x0 - 0.5, e.y1 + 0.5]];
+      const posts = [];
+      for (let i = 0; i < 4; i++) {
+        const [ax, ay] = corners[i], [bx, by] = corners[(i + 1) % 4];
+        const steps = Math.max(Math.abs(bx - ax), Math.abs(by - ay));
+        for (let s = 0; s < steps; s++) posts.push(tileToScreen(ax + ((bx - ax) * s) / steps, ay + ((by - ay) * s) / steps));
+      }
+      for (const [h, w] of [[4, 3], [10, 3]]) {
+        f.lineStyle(w + 2, FENCE_SHADE, 1);
+        f.strokePoints(posts.map((p) => ({ x: p.x, y: p.y - h })), true);
+        f.lineStyle(w, FENCE_COLOR, 1);
+        f.strokePoints(posts.map((p) => ({ x: p.x, y: p.y - h - 0.5 })), true);
+      }
+      for (const p of posts) {
+        f.fillStyle(FENCE_SHADE, 1);
+        f.fillRect(p.x - 2.5, p.y - 15, 5, 16);
+        f.fillStyle(FENCE_COLOR, 1);
+        f.fillRect(p.x - 2.5, p.y - 15, 3, 15);
+      }
     }
 
     const alive = new Set();
@@ -105,7 +122,15 @@ export class GameScene extends Phaser.Scene {
       if (this.buildingSprites.has(b.id)) continue;
       const big = b.x1 > b.x0;
       const center = big ? tileToScreen(b.x0 + 0.5, b.y0 + 0.5) : tileToScreen(b.x0, b.y0);
-      const s = this.add.image(center.x, center.y + (big ? 14 : 8), b.type).setOrigin(0.5, 1);
+      const key = realKey(this, b.type);
+      let s;
+      if (key !== b.type) {
+        // Blender render: the tile centre sits 16 px (per tile) above the image bottom
+        s = this.add.image(center.x, center.y + (big ? 32 : 16), key).setOrigin(0.5, 1);
+        s.setDisplaySize(big ? 128 : 64, big ? 160 : 96);
+      } else {
+        s = this.add.image(center.x, center.y + (big ? 14 : 8), b.type).setOrigin(0.5, 1);
+      }
       s.setDepth(tileToScreen(b.x1, b.y1).y);
       this.buildingSprites.set(b.id, s);
     }
