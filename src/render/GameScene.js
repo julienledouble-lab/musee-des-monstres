@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 import { tileToScreen, screenToTile } from '../sim/iso.js';
 import { generateTextures } from './textures.js';
-import { preloadSprites, resolveMonsterTexture, realKey } from './sprites.js';
+import {
+  preloadSprites, resolveMonsterTexture, realKey, directionIndex, DIRECTIONAL_ORIGIN_Y,
+} from './sprites.js';
 import { capacity } from '../sim/breeding.js';
 
 const GROUND_DEPTH = -1e6;
@@ -149,7 +151,8 @@ export class GameScene extends Phaser.Scene {
     for (const m of world.monsters.values()) {
       if (m.state === 'stored') continue;
       alive.add(m.id);
-      const look = resolveMonsterTexture(this, m);
+      const entry0 = this.entitySprites.get(m.id);
+      const look = resolveMonsterTexture(this, m, entry0 ? entry0.dir : 0);
       const entry = this.entry(m.id, 'monster', look.key);
       if (entry.sprite.texture.key !== look.key) entry.sprite.setTexture(look.key);
       if (look.tint) entry.sprite.setTint(look.tint);
@@ -167,19 +170,31 @@ export class GameScene extends Phaser.Scene {
         }
       }
       const p = tileToScreen(x, y);
-      const bob = Math.abs(Math.sin(time * 0.006 + entry.phase)) * (look.real ? 1.2 : 3);
-      const dx = p.x - entry.lastX;
-      if (Math.abs(dx) > 0.05) {
-        // real images face left, procedural ones face the viewer: flip toward the walking direction
-        entry.sprite.setFlipX(look.real ? dx > 0 : dx < 0);
+      // turn toward the walking direction (tile-space movement since last frame)
+      const mdx = x - (entry.lastTX ?? x), mdy = y - (entry.lastTY ?? y);
+      entry.lastTX = x;
+      entry.lastTY = y;
+      const moving = Math.hypot(mdx, mdy) > 0.0015;
+      if (look.directional) {
+        if (moving) entry.dir = directionIndex(mdx, mdy);
+        entry.sprite.setFlipX(false).setOrigin(0.5, DIRECTIONAL_ORIGIN_Y);
+      } else {
+        const dx = p.x - entry.lastX;
+        // single real images face left, procedural ones face the viewer: flip toward the walking direction
+        if (Math.abs(dx) > 0.05) entry.sprite.setFlipX(look.real ? dx > 0 : dx < 0);
+        entry.sprite.setOrigin(0.5, 1);
       }
       entry.lastX = p.x;
-      entry.sprite.setPosition(p.x, p.y + 8 - bob).setDepth(p.y);
+      const bob = Math.abs(Math.sin(time * 0.006 + entry.phase)) * (look.real ? 1.2 : 3);
+      entry.sprite.setPosition(p.x, p.y + (look.directional ? 0 : 8) - bob).setDepth(p.y);
       const pulse = m.state === 'escaped' ? 1 + 0.08 * Math.sin(time * 0.02) : 1;
       entry.sprite.setScale(look.scale * pulse);
-      entry.shadow.setPosition(p.x, p.y + 6).setDepth(p.y - 0.5)
-        .setScale(look.real ? (entry.sprite.displayWidth / 64) * 0.9 : 0.7, look.real ? 0.9 : 0.7);
-      this.setBubble(entry, m.state === 'escaped' ? 'bubble-scared' : null, p, entry.sprite.displayHeight + 4);
+      let shadow = [0.7, 0.7];
+      if (look.directional) shadow = [1.3, 1.0];
+      else if (look.real) shadow = [(entry.sprite.displayWidth / 64) * 0.9, 0.9];
+      entry.shadow.setPosition(p.x, p.y + (look.directional ? 1 : 6)).setDepth(p.y - 0.5).setScale(shadow[0], shadow[1]);
+      const top = look.directional ? entry.sprite.displayHeight * DIRECTIONAL_ORIGIN_Y : entry.sprite.displayHeight;
+      this.setBubble(entry, m.state === 'escaped' ? 'bubble-scared' : null, p, top - 10);
     }
 
     for (const v of world.visitors) {
@@ -215,7 +230,7 @@ export class GameScene extends Phaser.Scene {
     let e = this.entitySprites.get(id);
     if (!e) {
       const sprite = this.add.image(0, 0, texture).setOrigin(0.5, 1);
-      e = { sprite, bubble: null, kind, phase: Math.random() * 10, lastX: 0 };
+      e = { sprite, bubble: null, kind, phase: Math.random() * 10, lastX: 0, dir: 0 };
       this.entitySprites.set(id, e);
     }
     return e;

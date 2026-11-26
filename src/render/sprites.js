@@ -32,10 +32,31 @@ export function realKey(scene, key) {
   return key;
 }
 
-// Which texture to draw a monster with: { key, tint, real, scale }.
-export function resolveMonsterTexture(scene, monster) {
+// 3D models rendered in Blender in 8 directions: "<speciesId>-d0.png" ... "-d7.png" (256 px, 2x scale,
+// feet centre 40 px above the bottom). d0 faces +ty (screen bottom-left), each next one turns 45 deg.
+export const DIRECTIONAL_SCALE = 0.5;
+export const DIRECTIONAL_ORIGIN_Y = 216 / 256;
+
+// Direction index 0..7 for a movement (dx, dy) in tile units.
+export function directionIndex(dx, dy) {
+  const deg = (Math.atan2(dx, dy) * 180) / Math.PI;
+  return ((Math.round(deg / 45) % 8) + 8) % 8;
+}
+
+// Which texture to draw a monster with: { key, tint, real, scale, directional }.
+export function resolveMonsterTexture(scene, monster, dir = 0) {
   const base = monster.speciesId;
   const has = (k) => scene.textures.exists(`real-${k}`);
+  if (has(`${base}-d0`)) {
+    const rareDir = monster.rare && has(`${base}-rare-d0`);
+    return {
+      key: `real-${base}${rareDir ? '-rare' : ''}-d${dir}`,
+      tint: monster.rare && !rareDir ? RARE_FALLBACK_TINT : null,
+      real: true,
+      directional: true,
+      scale: DIRECTIONAL_SCALE,
+    };
+  }
   if (monster.rare && has(`${base}-rare`)) return { key: `real-${base}-rare`, tint: null, real: true, scale: SPRITE_SCALE[base] };
   if (has(base)) {
     return { key: `real-${base}`, tint: monster.rare ? RARE_FALLBACK_TINT : null, real: true, scale: SPRITE_SCALE[base] };
