@@ -9,7 +9,7 @@ const ui = createUI(world);
 const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'game',
-  backgroundColor: '#8ecae6',
+  backgroundColor: '#22351f', // dark forest green beyond the scenery ring
   scale: { mode: Phaser.Scale.RESIZE, width: window.innerWidth, height: window.innerHeight },
   // load every image in one batch (the queue otherwise waits for game-loop ticks between batches)
   loader: { maxParallelDownloads: 64 },

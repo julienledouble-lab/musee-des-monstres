@@ -44,10 +44,12 @@ export class GameScene extends Phaser.Scene {
       }
     }
     this.fences = this.add.graphics().setDepth(FENCE_DEPTH);
+    this.fenceSprites = [];
     this.ghost = this.add.graphics().setDepth(GHOST_DEPTH);
     this.buildingSprites = new Map();
     this.entitySprites = new Map(); // id -> { sprite, bubble, kind }
     this.lastGridVersion = -1;
+    this.createSurroundings();
 
     this.cameras.main.setZoom(1.2);
     this.centerView();
@@ -57,6 +59,43 @@ export class GameScene extends Phaser.Scene {
 
     this.setupInput();
     this.ui.bindScene(this);
+  }
+
+  // Static scenery around the playable grid: grass ring, a forest edge and the entrance gate.
+  // Purely visual; uses the Blender renders when they are loaded.
+  createSurroundings() {
+    const { grid, entrance } = this.world;
+    const has = (k) => this.textures.exists(k);
+    const RING = 7;
+    let seed = 12345;
+    const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
+    for (let ty = -RING; ty < grid.h + RING; ty++) {
+      for (let tx = -RING; tx < grid.w + RING; tx++) {
+        if (grid.inBounds(tx, ty)) continue;
+        const p = tileToScreen(tx, ty);
+        const key = realKey(this, (tx * 7 + ty * 13) % 5 === 0 ? 'tile-grass2' : 'tile-grass');
+        this.add.image(p.x, p.y, key).setDisplaySize(66, 33).setDepth(GROUND_DEPTH);
+      }
+    }
+    // forest edge: trees on every other cell of the ring, denser further out
+    if (has('img-prop-pine') && has('img-prop-oak')) {
+      for (let ty = -RING; ty < grid.h + RING; ty += 2) {
+        for (let tx = -RING; tx < grid.w + RING; tx += 2) {
+          const out = Math.max(-tx, -ty, tx - grid.w + 1, ty - grid.h + 1); // distance outside the grid
+          if (out < 2) continue;
+          if (rnd() > 0.35 + out * 0.1) continue;
+          const jx = tx + rnd() * 0.8, jy = ty + rnd() * 0.8;
+          const c = tileToScreen(jx + 0.5, jy + 0.5);
+          const key = rnd() < 0.55 ? 'img-prop-pine' : 'img-prop-oak';
+          const s = 0.85 + rnd() * 0.35;
+          this.add.image(c.x, c.y + 32 * s, key).setOrigin(0.5, 1).setDisplaySize(128 * s, 192 * s).setDepth(c.y);
+        }
+      }
+    }
+    if (has('img-prop-gate')) {
+      const c = tileToScreen(entrance.tx, entrance.ty);
+      this.add.image(c.x, c.y + 16, 'img-prop-gate').setOrigin(0.5, 1).setDisplaySize(64, 128).setDepth(c.y + 1);
+    }
   }
 
   setTool(tool) {
@@ -99,10 +138,24 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // wooden fence: a post at every tile corner and two rails between posts
+    // fences: one 3D-rendered segment per tile edge, depth-sorted so monsters pass behind
+    // the front edges; falls back to drawn lines when the renders are missing
     this.fences.clear();
+    for (const s of this.fenceSprites) s.destroy();
+    this.fenceSprites = [];
+    const realFence = this.textures.exists('img-prop-fenceX') && this.textures.exists('img-prop-fenceY');
     const f = this.fences;
     for (const e of builder.enclosures.values()) {
+      if (realFence) {
+        const segs = [];
+        for (let i = e.x0; i <= e.x1; i++) segs.push([i, e.y0 - 0.5, 'X'], [i, e.y1 + 0.5, 'X']);
+        for (let j = e.y0; j <= e.y1; j++) segs.push([e.x0 - 0.5, j, 'Y'], [e.x1 + 0.5, j, 'Y']);
+        for (const [mx, my, axis] of segs) {
+          const c = tileToScreen(mx, my);
+          this.fenceSprites.push(this.add.image(c.x, c.y, `img-prop-fence${axis}`).setDisplaySize(64, 64).setDepth(c.y));
+        }
+        continue;
+      }
       const corners = [[e.x0 - 0.5, e.y0 - 0.5], [e.x1 + 0.5, e.y0 - 0.5], [e.x1 + 0.5, e.y1 + 0.5], [e.x0 - 0.5, e.y1 + 0.5]];
       const posts = [];
       for (let i = 0; i < 4; i++) {
@@ -130,7 +183,14 @@ export class GameScene extends Phaser.Scene {
       if (this.buildingSprites.has(b.id)) continue;
       const big = b.x1 > b.x0;
       const center = big ? tileToScreen(b.x0 + 0.5, b.y0 + 0.5) : tileToScreen(b.x0, b.y0);
-      const key = realKey(this, b.type);
+      let key = realKey(this, b.type);
+      if (b.type === 'decoration') {
+        // several realistic decorations, picked from the building id so it never changes
+        const variants = ['img-bld-decoration', 'img-prop-bush', 'img-prop-lamp', 'img-prop-bench', 'img-prop-flowers', 'img-prop-rock']
+          .filter((k) => this.textures.exists(k));
+        const n = Number(String(b.id).replace(/\D/g, '')) || 0;
+        if (variants.length) key = variants[n % variants.length];
+      }
       let s;
       if (key !== b.type) {
         // Blender render: the tile centre sits 16 px (per tile) above the image bottom
