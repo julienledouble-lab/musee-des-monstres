@@ -129,15 +129,15 @@ class UI {
     const w = this.world;
     const stars = Math.round(w.reputation * 2) / 2;
     const full = Math.floor(stars);
-    const starText = '★'.repeat(full) + (stars > full ? '⯪' : '') + '☆'.repeat(5 - Math.ceil(stars));
+    const starText = '★'.repeat(full) + (stars > full ? '½' : '') + '<span style="opacity:.3">' + '★'.repeat(5 - Math.ceil(stars)) + '</span>';
     const speedBtn = (s, label) => `<button data-speed="${s}" class="${w.speed === s ? 'active' : ''}">${label}</button>`;
     const moneyColor = w.wallet.money < 0 ? 'color:var(--bad)' : '';
     return `
-      <span class="stat" style="${moneyColor}">💰 ${esc(t('hud.money', { n: fmt(w.wallet.money) }))}</span>
-      <span class="stat">🧍 ${esc(t('hud.visitors', { n: w.visitors.length }))}</span>
-      <span class="stars" title="${esc(t('hud.reputation'))}">${starText}</span>
-      <span class="group">${speedBtn(0, '⏸')}${speedBtn(1, 'x1')}${speedBtn(2, 'x2')}${speedBtn(3, 'x3')}</span>
-      <span class="group"><button data-ticket="-5">−</button><span class="stat">🎟 ${esc(t('hud.ticket', { n: w.ticketPrice }))}</span><button data-ticket="5">+</button></span>`;
+      <span class="stat" style="${moneyColor}">${esc(t('hud.money', { n: fmt(w.wallet.money) }))}</span>
+      <span class="stat">${esc(t('hud.visitors', { n: w.visitors.length }))}</span>
+      <span><span class="label">${esc(t('hud.reputation'))}</span><span class="stars">${starText}</span></span>
+      <span class="group">${speedBtn(0, '❚❚')}${speedBtn(1, 'x1')}${speedBtn(2, 'x2')}${speedBtn(3, 'x3')}</span>
+      <span class="group"><button data-ticket="-5">−</button><span class="stat">${esc(t('hud.ticket', { n: w.ticketPrice }))}</span><button data-ticket="5">+</button></span>`;
   }
 
   renderObjectives() {
@@ -180,7 +180,7 @@ class UI {
         <div class="row">${esc(t('monster.happiness', { n: Math.round(m.happiness) }))}${bar(m.happiness)}</div>
         <div class="row">${esc(t('monster.hunger', { n: Math.round(m.hunger) }))}${bar(m.hunger, true)}</div>
         ${body}
-        <div class="row"><button data-action="feed" data-id="${m.id}">🍖 ${esc(t('monster.feed', { n: BALANCE.feedCost }))}</button></div>`;
+        <div class="row"><button data-action="feed" data-id="${m.id}">${esc(t('monster.feed', { n: BALANCE.feedCost }))}</button></div>`;
     }
 
     if (sel.kind === 'visitor') {
@@ -200,10 +200,10 @@ class UI {
       const max = capacity(e, e.speciesId);
       const list = e.monsterIds.map((id) => w.monsters.get(id)).filter(Boolean).map((m) => `
         <button data-action="open" data-id="${m.id}"><img src="${this.img(resolveMonsterTexture(this.scene, m).key)}">
-          <span>${esc(this.monsterName(m))} · ${Math.round(m.happiness)} %${m.state === 'escaped' ? ' · ⚠' : ''}</span></button>`).join('');
+          <span>${esc(this.monsterName(m))} · ${Math.round(m.happiness)} %${m.state === 'escaped' ? ` · <span style="color:var(--bad)">${esc(t('monster.escapedShort'))}</span>` : ''}</span></button>`).join('');
       const pending = w.hatchery.eggs.filter((egg) => egg.parentEnclosureId === e.id).length;
       let nest;
-      if (pending) nest = `<div class="row">🥚 ${esc(t('enclosure.nestEgg'))}</div>`;
+      if (pending) nest = `<div class="row">${esc(t('enclosure.nestEgg'))}</div>`;
       else if (canBreed(e, w.monsters, 0)) {
         nest = `<div class="row">${esc(t('enclosure.nest', { s: Math.ceil(BALANCE.breedTimeSec - e.breedTimer) }))}${bar(100 * e.breedTimer / BALANCE.breedTimeSec)}</div>`;
       } else if (e.monsterIds.length >= max) nest = `<div class="row">${esc(t('enclosure.nestFull'))}</div>`;

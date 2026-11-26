@@ -10,6 +10,7 @@ export const fr = {
   'event.keeperHired': 'Gardien embauché ({n} pièces / min)',
   'monster.inHatchery': 'Dans la couveuse, en attente d\'un enclos',
   'monster.catch': 'Attraper',
+  'monster.escapedShort': 'évadé',
   'monster.habitat': 'Habitat : {h}',
   'visitor.title': 'Visiteur',
   'enclosure.size': '{n} cases',

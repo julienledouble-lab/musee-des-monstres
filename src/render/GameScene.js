@@ -5,9 +5,10 @@ import {
   preloadSprites, resolveMonsterTexture, realKey, directionIndex, DIRECTIONAL_ORIGIN_Y,
   createAnimations, hasAnimation,
 } from './sprites.js';
+import { createWanderer, stepWander, findFreeSpot } from './wander.js';
 
-const WANDER_SPEED = 0.7; // tiles per second of game time, matches the walk cycle
-const WANDER_PAUSE = [2, 5]; // seconds of rest between two walks
+// Footprint of each monster on the ground (tile units), used to keep them from overlapping.
+const MONSTER_RADIUS = { dragonnet: 0.6, kraken: 0.6, spectre: 0.4, golem: 0.45, yeti: 0.45 };
 import { capacity } from '../sim/breeding.js';
 
 const GROUND_DEPTH = -1e6;
@@ -149,34 +150,24 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  // Visual-only stroll of an enclosed monster: walk to a random point, rest, repeat.
-  // Returns the drawn position (tile units).
-  wanderInEnclosure(entry, e, dt) {
-    const minX = e.x0 - 0.2, maxX = e.x1 + 0.2, minY = e.y0 - 0.2, maxY = e.y1 + 0.2;
-    if (entry.wx === undefined || entry.wEnc !== e.id) {
+  // Visual-only stroll of an enclosed monster (src/render/wander.js): walk to a free spot,
+  // rest, repeat, never through another monster of the same enclosure. Returns the drawn position.
+  wanderInEnclosure(m, entry, e, dt) {
+    const r = MONSTER_RADIUS[m.speciesId] ?? 0.5;
+    const bounds = { minX: e.x0 - 0.1, maxX: e.x1 + 0.1, minY: e.y0 - 0.1, maxY: e.y1 + 0.1 };
+    const others = [];
+    for (const id of e.monsterIds) {
+      if (id === m.id) continue;
+      const o = this.entitySprites.get(id);
+      if (o && o.w && o.wEnc === e.id) others.push(o.w);
+    }
+    if (!entry.w || entry.wEnc !== e.id) {
       entry.wEnc = e.id;
-      entry.wx = minX + Math.random() * (maxX - minX);
-      entry.wy = minY + Math.random() * (maxY - minY);
-      entry.goal = null;
-      entry.rest = Math.random() * WANDER_PAUSE[1];
+      entry.w = createWanderer(findFreeSpot(bounds, others, r, Math.random), r);
+      entry.w.rest = Math.random() * 3;
     }
-    if (entry.rest > 0) {
-      entry.rest -= dt;
-      if (entry.rest <= 0) entry.goal = { x: minX + Math.random() * (maxX - minX), y: minY + Math.random() * (maxY - minY) };
-    } else if (entry.goal) {
-      const dx = entry.goal.x - entry.wx, dy = entry.goal.y - entry.wy;
-      const d = Math.hypot(dx, dy), step = WANDER_SPEED * dt;
-      if (d <= step) {
-        entry.wx = entry.goal.x;
-        entry.wy = entry.goal.y;
-        entry.goal = null;
-        entry.rest = WANDER_PAUSE[0] + Math.random() * (WANDER_PAUSE[1] - WANDER_PAUSE[0]);
-      } else {
-        entry.wx += (dx / d) * step;
-        entry.wy += (dy / d) * step;
-      }
-    }
-    return { x: entry.wx, y: entry.wy };
+    stepWander(entry.w, others, bounds, dt, Math.random);
+    return { x: entry.w.x, y: entry.w.y };
   }
 
   syncEntities(time, dt = 0) {
@@ -200,9 +191,9 @@ export class GameScene extends Phaser.Scene {
       let x = m.pos.x, y = m.pos.y;
       if (m.state === 'enclosed') {
         const e = world.builder.enclosures.get(m.enclosureId);
-        if (e) ({ x, y } = this.wanderInEnclosure(entry, e, dt));
+        if (e) ({ x, y } = this.wanderInEnclosure(m, entry, e, dt));
       } else {
-        entry.wx = undefined;
+        entry.w = null;
       }
       const p = tileToScreen(x, y);
       // turn toward the walking direction (tile-space movement since last frame)

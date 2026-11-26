@@ -247,8 +247,12 @@ export function generateTextures(scene) {
   });
 
   // mood bubbles (24 x 24)
+  // discreet dark disc with a small coloured sign (no cartoon outline)
   const bubble = (key, draw) => tex(scene, key, 24, 24, (g) => {
-    shape(g, 0xffffff, (m) => g[`${m}Circle`](12, 12, 10));
+    g.fillStyle(0x12161a, 0.72);
+    g.fillCircle(12, 12, 9);
+    g.lineStyle(1, 0xffffff, 0.25);
+    g.strokeCircle(12, 12, 9);
     draw(g);
   });
   bubble('bubble-happy', (g) => {
